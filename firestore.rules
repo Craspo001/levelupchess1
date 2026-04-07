@@ -1,0 +1,101 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required) - Unique user ID
+//   - displayName: string (optional) - User's display name
+//   - email: string (required, email format) - User's email
+//   - photoURL: string (optional) - User's profile picture URL
+//   - createdAt: string (optional, ISO 8601) - Account creation timestamp
+//
+// Collection: trainingSessions
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required) - User ID of the owner
+//   - pgn: string (required) - PGN string of the game
+//   - fen: string (required) - Current FEN string
+//   - updatedAt: string (optional, ISO 8601) - Last updated timestamp
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "babahabibbabalola@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.*Z?$");
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.uid.size() < 128 &&
+             isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000)) &&
+             (!('createdAt' in data) || isValidDateString(data.createdAt)) &&
+             (!('role' in data) || data.role == 'user' || isAdmin());
+    }
+
+    function isValidTrainingSession(data) {
+      return data.keys().hasAll(['uid', 'pgn', 'fen']) &&
+             data.uid == request.auth.uid &&
+             data.uid.size() < 128 &&
+             data.pgn is string && data.pgn.size() < 50000 &&
+             data.fen is string && data.fen.size() < 256 &&
+             (!('updatedAt' in data) || isValidDateString(data.updatedAt));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow delete: if false; // Users cannot delete their profiles for now
+    }
+
+    match /trainingSessions/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidTrainingSession(request.resource.data);
+      allow update: if isOwner(userId) && isValidTrainingSession(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "email": { "type": "string", "format": "email", "description": "User's email" },
+        "photoURL": { "type": "string", "description": "User's profile picture URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "TrainingSession": {
+      "title": "TrainingSession",
+      "description": "A chess training session",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID of the owner" },
+        "pgn": { "type": "string", "description": "PGN string of the game" },
+        "fen": { "type": "string", "description": "Current FEN string" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last updated timestamp" }
+      },
+      "required": ["uid", "pgn", "fen"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/trainingSessions/{userId}": {
+      "schema": "TrainingSession",
+      "description": "The current training session for a user"
+    }
+  }
+}
